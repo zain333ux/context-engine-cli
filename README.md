@@ -20,8 +20,8 @@ Bridge the gap between massive local codebases and Large Language Models (LLMs).
 Clone the repository, then install it locally in editable mode:
 
 ```bash
-git clone <your-repo-url>
-cd context-engine
+git clone https://github.com/zain333ux/context-engine-cli.git
+cd context-engine-cli
 python -m pip install -e .
 ```
 

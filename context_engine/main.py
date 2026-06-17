@@ -5,7 +5,6 @@ import concurrent.futures
 import fnmatch
 import os
 import re
-import threading
 from pathlib import Path
 
 
@@ -253,11 +252,10 @@ def build_context_file(
     output_path: Path,
     max_tokens: int | None = None,
 ) -> tuple[int, int, int]:
-    """Read files concurrently and write clean sections to a context file."""
+    """Read files concurrently and write sections in deterministic file order."""
     separator = "=" * 80
     processed_count = 0
     skipped_count = 0
-    token_limit_reached = False
     header = (
         "CODEBASE CONTEXT\n"
         f"{separator}\n"
@@ -267,33 +265,17 @@ def build_context_file(
     )
     current_char_count = len(header)
     current_token_count = estimate_tokens_from_chars(current_char_count)
-    write_lock = threading.Lock()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def process_file(file_path: Path) -> None:
-        nonlocal current_char_count
-        nonlocal current_token_count
-        nonlocal processed_count
-        nonlocal skipped_count
-        nonlocal token_limit_reached
-
+    def read_file_section(file_path: Path) -> tuple[Path, str | None, str | None]:
         try:
             contents = file_path.read_text(encoding="utf-8")
         except PermissionError:
-            with write_lock:
-                skipped_count += 1
-                print_warning(f"Permission denied, skipped {_display_path(file_path)}")
-            return
+            return file_path, None, f"Permission denied, skipped {_display_path(file_path)}"
         except UnicodeDecodeError:
-            with write_lock:
-                skipped_count += 1
-                print_warning(f"Could not decode as UTF-8, skipped {_display_path(file_path)}")
-            return
+            return file_path, None, f"Could not decode as UTF-8, skipped {_display_path(file_path)}"
         except OSError as error:
-            with write_lock:
-                skipped_count += 1
-                print_warning(f"Could not read {_display_path(file_path)} ({error})")
-            return
+            return file_path, None, f"Could not read {_display_path(file_path)} ({error})"
 
         file_section = (
             f"{separator}\n"
@@ -305,26 +287,7 @@ def build_context_file(
             file_section += "\n"
         file_section += "\n"
 
-        with write_lock:
-            if token_limit_reached:
-                skipped_count += 1
-                return
-
-            next_char_count = current_char_count + len(file_section)
-            next_token_count = estimate_tokens_from_chars(next_char_count)
-            if max_tokens is not None and next_token_count > max_tokens:
-                token_limit_reached = True
-                skipped_count += 1
-                print_warning(
-                    "Max token limit reached; skipped "
-                    f"{_display_path(file_path)} and remaining files."
-                )
-                return
-
-            output_file.write(file_section)
-            current_char_count = next_char_count
-            current_token_count = next_token_count
-            processed_count += 1
+        return file_path, file_section, None
 
     with output_path.open("w", encoding="utf-8") as output_file:
         output_file.write(header)
@@ -335,12 +298,32 @@ def build_context_file(
 
         max_workers = min(32, (os.cpu_count() or 1) + 4)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = (
-                executor.submit(process_file, file_path)
-                for file_path in valid_files
-            )
-            for future in concurrent.futures.as_completed(futures):
-                future.result()
+            results = executor.map(read_file_section, valid_files)
+
+            for file_path, file_section, warning in results:
+                if warning is not None:
+                    skipped_count += 1
+                    print_warning(warning)
+                    continue
+
+                if file_section is None:
+                    skipped_count += 1
+                    continue
+
+                next_char_count = current_char_count + len(file_section)
+                next_token_count = estimate_tokens_from_chars(next_char_count)
+                if max_tokens is not None and next_token_count > max_tokens:
+                    skipped_count += len(valid_files) - processed_count - skipped_count
+                    print_warning(
+                        "Max token limit reached; skipped "
+                        f"{_display_path(file_path)} and remaining files."
+                    )
+                    break
+
+                output_file.write(file_section)
+                current_char_count = next_char_count
+                current_token_count = next_token_count
+                processed_count += 1
 
     return processed_count, skipped_count, current_token_count
 
