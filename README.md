@@ -182,7 +182,7 @@ context-engine test_env -o test_env_context.txt
 
 ## 📄 Package Metadata
 
-- Package name: `context-engine`
+- Package name: `context-engine-zain333`
 - Python package: `context_engine`
 - Entry point: `context-engine = context_engine.main:main`
 - Python version: `>=3.10`
