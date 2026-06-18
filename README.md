@@ -2,12 +2,13 @@
 
 Bridge the gap between massive local codebases and Large Language Models (LLMs). Context Engine CLI turns a repository into a clean, single-file context bundle that is easier to inspect, share, and paste into AI tools.
 
-## ✨ Key Features
+## ✨ Features
 
+- **Deterministic LLM-ready context** that preserves the original file traversal order, even while reading files concurrently.
+- **Clean single-file output** with a directory tree and clearly separated file sections for easy LLM parsing.
 - **Fast directory traversal** with `os.scandir`, avoiding slower recursive path walking.
 - **Memory-safe output streaming** that writes directly to disk instead of building one huge string in RAM.
 - **Concurrent file reading** with `ThreadPoolExecutor` for faster aggregation on large repositories.
-- **Safe synchronized writes** with `threading.Lock` so multithreaded output stays clean and readable.
 - **`.gitignore` and `.contextignore` support** for project-specific filtering.
 - **Precompiled ignore rules** using `fnmatch.translate` and `re.Pattern` for faster repeated matching.
 - **Default binary and build-artifact exclusions** for files such as `.png`, `.exe`, `.pdf`, `.pyc`, `node_modules`, `__pycache__`, and `.git`.
@@ -17,12 +18,10 @@ Bridge the gap between massive local codebases and Large Language Models (LLMs).
 
 ## 📦 Installation
 
-Clone the repository, then install it locally in editable mode:
+Install from PyPI:
 
 ```bash
-git clone https://github.com/zain333ux/context-engine-cli.git
-cd context-engine-cli
-python -m pip install -e .
+pip install context-engine-zain333
 ```
 
 After installation, the `context-engine` command is available from your terminal:
@@ -35,49 +34,37 @@ context-engine --help
 
 ## 🚀 Usage
 
-### Basic scan
-
-Generate a `codebase_context.txt` file from a target project:
+Generate a clean context file for a local project:
 
 ```bash
 context-engine ./my-project
 ```
 
-### Choose an output file
+By default, this creates:
+
+```bash
+codebase_context.txt
+```
+
+Write to a custom output file:
 
 ```bash
 context-engine ./my-project --output project_context.txt
 ```
 
-Short form:
-
-```bash
-context-engine ./my-project -o project_context.txt
-```
-
-### Ignore additional file extensions
-
-Pass a comma-separated list of extensions to exclude:
+Ignore additional file extensions:
 
 ```bash
 context-engine ./my-project --ignore .csv,.sqlite,.bak
 ```
 
-Extensions can be provided with or without the leading dot:
-
-```bash
-context-engine ./my-project -i csv,sqlite,bak
-```
-
-### Limit estimated LLM tokens
-
-Stop appending files once the estimated output would exceed a token budget:
+Limit the estimated token budget:
 
 ```bash
 context-engine ./my-project --max-tokens 100000
 ```
 
-Combine options:
+Combine options for larger repositories:
 
 ```bash
 context-engine ./my-project \
