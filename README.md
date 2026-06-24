@@ -108,7 +108,7 @@ File: context_engine/main.py
 [FILE CONTENT HERE]
 ```
 
-## 🙈 Ignore Rules
+## 🚫 Ignore Rules
 
 Context Engine CLI reads ignore patterns once at startup from:
 
